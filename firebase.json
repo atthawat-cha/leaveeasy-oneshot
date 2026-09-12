@@ -12,7 +12,10 @@
       "docs/**",
       "*.md",
       "package*.json",
-      "seed.html"
+      "seed.html",
+      "js/ai-config.js",
+      "js/ai-config.example.js",
+      "ai-test/**"
     ]
   },
   "firestore": {

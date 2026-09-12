@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { db } from "./firebase-config.js";
-import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 (async function () {
   var รหัสใบลา = ค่าจากURL("id");
@@ -77,11 +77,98 @@ import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs } from "https://
       '<button type="button" class="btn-danger" id="ปุ่มลบ"' + (กดได้ ? "" : " disabled") + '>ลบใบลานี้</button>' +
       "</div>";
 
+    // ปุ่มผู้ช่วย AI ระดับ 2 — สรุปใบลาให้หัวหน้าอ่าน (ไม่ตัดสินอนุมัติ/ไม่อนุมัติแทนคน ไม่แตะช่อง status)
+    html +=
+      '<div class="btn-row">' +
+      '<button type="button" id="ปุ่มสรุปAI">ให้ AI ช่วยสรุปใบลาให้หัวหน้าอ่าน</button>' +
+      "</div>" +
+      '<div id="กล่องสรุปAI" class="alert alert-ai' + (ใบ.aiSuggestion ? "" : " hidden") + '">' +
+      (ใบ.aiSuggestion ? esc(ใบ.aiSuggestion) : "") +
+      "</div>";
+
     กล่องใบลา.innerHTML = html;
 
     document.getElementById("ปุ่มอนุมัติ").addEventListener("click", function () { เปลี่ยนสถานะ("อนุมัติ"); });
     document.getElementById("ปุ่มไม่อนุมัติ").addEventListener("click", function () { เปลี่ยนสถานะ("ไม่อนุมัติ"); });
     document.getElementById("ปุ่มลบ").addEventListener("click", ลบใบลา);
+    document.getElementById("ปุ่มสรุปAI").addEventListener("click", สรุปด้วยAI);
+  }
+
+  // ── ผู้ช่วย AI ระดับ 2 (agentic): อ่านใบลา → เขียนสรุปสั้น ๆ → เขียนสรุปกลับฐาน ──
+  // AI แค่สรุปให้อ่าน ไม่ตัดสินอนุมัติ/ไม่อนุมัติแทนคน — ฟังก์ชันนี้ไม่แตะช่อง status เลย
+  async function สรุปด้วยAI() {
+    var ปุ่ม = document.getElementById("ปุ่มสรุปAI");
+    var กล่องสรุป = document.getElementById("กล่องสรุปAI");
+
+    if (!window.AI_CONFIG || !window.AI_CONFIG.apiKey) {
+      กล่องสรุป.textContent = "⚠️ ยังไม่ได้ตั้งค่า js/ai-config.js — คัดลอกจาก js/ai-config.example.js แล้วใส่ API key";
+      กล่องสรุป.classList.remove("hidden");
+      return;
+    }
+
+    ปุ่ม.disabled = true;
+    var ข้อความปุ่มเดิม = ปุ่ม.textContent;
+    ปุ่ม.textContent = "กำลังสรุป...";
+
+    var ตัวยกเลิก = new AbortController();
+    var ตัวจับเวลา = setTimeout(function () { ตัวยกเลิก.abort(); }, 15000);
+
+    // ขั้นที่ 1: อ่านใบลาใบนี้ — ใช้ข้อมูลที่โหลดไว้แล้วตอนเปิดหน้า
+    var คำสั่ง =
+      "สรุปใบลานี้สั้น ๆ 2-3 ประโยคภาษาไทย ให้หัวหน้าอ่านก่อนตัดสินใจอนุมัติ/ไม่อนุมัติ:\n" +
+      "หัวข้อ: " + ใบ.title + "\n" +
+      "เหตุผล: " + ใบ.reason + "\n" +
+      "ประเภทการลา: " + ใบ.leaveTypeName + "\n" +
+      "ผู้ขอลา: " + ใบ.requesterName + "\n" +
+      "วันที่ลา: " + ใบ.startDate + " ถึง " + ใบ.endDate + "\n" +
+      "ตอบเฉพาะเนื้อความสรุป ห้ามแนะนำว่าควรอนุมัติหรือไม่อนุมัติ";
+
+    try {
+      // ขั้นที่ 2: เขียนสรุปสั้น ๆ
+      var ผลตอบกลับ = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal: ตัวยกเลิก.signal,
+        headers: {
+          "Authorization": "Bearer " + window.AI_CONFIG.apiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: window.AI_CONFIG.model,
+          messages: [{ role: "user", content: คำสั่ง }]
+        })
+      });
+
+      if (!ผลตอบกลับ.ok) {
+        throw new Error("HTTP " + ผลตอบกลับ.status);
+      }
+
+      var ข้อมูล = await ผลตอบกลับ.json();
+      var สรุป = ((ข้อมูล.choices && ข้อมูล.choices[0] && ข้อมูล.choices[0].message.content) || "").trim();
+
+      if (!สรุป) {
+        throw new Error("AI ไม่ตอบข้อความสรุปกลับมา");
+      }
+
+      // ขั้นที่ 3: เขียนสรุปกลับฐาน — แก้เฉพาะช่อง aiSuggestion ช่องเดียว ไม่แตะ status
+      await updateDoc(doc(db, "leaveRequests", รหัสใบลา), { aiSuggestion: สรุป });
+      await addDoc(collection(db, "leaveRequests", รหัสใบลา, "aiLog"), {
+        input: คำสั่ง,
+        output: สรุป,
+        createdAt: เวลาตอนนี้()
+      });
+
+      ใบ.aiSuggestion = สรุป;
+      กล่องสรุป.textContent = สรุป;
+      กล่องสรุป.classList.remove("hidden");
+    } catch (ข้อผิดพลาด) {
+      console.error("สรุปด้วยAI ล้มเหลว:", ข้อผิดพลาด);
+      กล่องสรุป.textContent = "⚠️ เรียก AI ไม่สำเร็จหรือใช้เวลานานเกินไป — ลองใหม่ได้ภายหลัง";
+      กล่องสรุป.classList.remove("hidden");
+    } finally {
+      clearTimeout(ตัวจับเวลา);
+      ปุ่ม.disabled = false;
+      ปุ่ม.textContent = ข้อความปุ่มเดิม;
+    }
   }
 
   // ── เปลี่ยนสถานะ — เขียนกลับ Firestore เฉพาะช่อง status เท่านั้น ──
