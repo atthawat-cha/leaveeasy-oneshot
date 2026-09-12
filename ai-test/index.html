@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>ทดสอบ OpenRouter AI</title>
+  <style>
+    body { font-family: sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    button { padding: 8px 16px; font-size: 16px; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.6; }
+    #output { margin-top: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 4px; white-space: pre-wrap; min-height: 24px; }
+  </style>
+</head>
+<body>
+  <h1>ทดสอบเรียก OpenRouter AI</h1>
+  <p>ไฟล์ทดลองนี้อยู่นอกระบบ LeaveEasy — ใช้เช็กว่าเรียก API และโมเดล <code>google/gemini-2.5-flash-lite</code> ผ่าน OpenRouter ได้จริงเท่านั้น</p>
+  <button id="sendBtn">ส่งข้อความ "สวัสดี"</button>
+  <div id="output"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
