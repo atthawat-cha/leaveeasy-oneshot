@@ -28,6 +28,9 @@ ai-test/config.js
 # ── ไฟล์ที่เก็บ API key ของปุ่มผู้ช่วย AI ในระบบ LeaveEasy จริง (สัปดาห์ที่ 8) ──
 js/ai-config.js
 
+# ── ไฟล์ที่เก็บ Firebase config จริง (คัดลอกจาก js/firebase-config.example.js เอง) ──
+js/firebase-config.js
+
 
 # ─────────────────────────────────────────────────────────────
 # ✅ วิธีตรวจว่าใช้ได้จริง — ก่อน push ทุกครั้ง พิมพ์บอก Claude ว่า
