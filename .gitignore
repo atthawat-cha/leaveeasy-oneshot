@@ -20,6 +20,10 @@ desktop.ini
 *.log
 .vscode/
 .idea/
+*.stackdump
+
+# ── ไฟล์ชั่วคราวของ Playwright MCP (สกรีนช็อต/ล็อกตอนทดสอบ) ──
+.playwright-mcp/
 
 
 # ── ไฟล์ที่เก็บ API key ของไฟล์ทดลอง AI (นอกระบบ LeaveEasy) ──
@@ -30,6 +34,9 @@ js/ai-config.js
 
 # ── ไฟล์ที่เก็บ Firebase config จริง (คัดลอกจาก js/firebase-config.example.js เอง) ──
 js/firebase-config.js
+
+# ── ไฟล์ที่เก็บรหัสผ่านบัญชีทดสอบของ tester agent (สัปดาห์ที่ 9) ──
+docs/workshop/Week8/week9/test-accounts.local.md
 
 
 # ─────────────────────────────────────────────────────────────

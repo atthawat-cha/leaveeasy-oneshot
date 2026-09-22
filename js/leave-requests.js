@@ -1,17 +1,28 @@
 // ─────────────────────────────────────────────────────────────
 // js/leave-requests.js — หน้าที่ 1 รายการใบลา
 // สัปดาห์ที่ 6: อ่านจากฐานข้อมูลจริง (Firestore) — โฟลเดอร์ leaveRequests
+// สัปดาห์ที่ 9: employee เห็นเฉพาะใบของตัวเอง · manager/hr เห็นทุกใบ (ตาม ACL.md)
 // ─────────────────────────────────────────────────────────────
 
-import { db } from "./firebase-config.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { db, auth } from "./firebase-config.js";
+import { collection, getDocs, query, where, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
-(async function () {
+onAuthStateChanged(auth, async function (ผู้ใช้) {
+  if (!ผู้ใช้) return; // js/auth-guard.js จะพาไปหน้าเข้าสู่ระบบเอง
+
   var กล่อง = document.getElementById("ผลลัพธ์");
 
   var ใบลาทั้งหมด;
   try {
-    var สแนปช็อต = await getDocs(collection(db, "leaveRequests"));
+    var เอกสารผู้ใช้ = await getDoc(doc(db, "users", ผู้ใช้.uid));
+    var บทบาท = เอกสารผู้ใช้.exists() ? เอกสารผู้ใช้.data().role : "employee";
+
+    var แหล่งข้อมูล = (บทบาท === "manager" || บทบาท === "hr")
+      ? collection(db, "leaveRequests")
+      : query(collection(db, "leaveRequests"), where("requesterId", "==", ผู้ใช้.uid));
+
+    var สแนปช็อต = await getDocs(แหล่งข้อมูล);
     ใบลาทั้งหมด = [];
     สแนปช็อต.forEach(function (เอกสาร) {
       ใบลาทั้งหมด.push(Object.assign({ id: เอกสาร.id }, เอกสาร.data()));
@@ -69,4 +80,4 @@ import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.18.0/
       });
     });
   }
-})();
+});

@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // firestore.rules — กฎเฝ้าข้อมูลของ LeaveEasy
-// สัปดาห์ที่ 7: กฎขั้นต่ำ "ต้องล็อกอินก่อน ถึงอ่าน/เขียนได้"
-// ยังไม่แยกสิทธิ์ตามบทบาท (employee/manager/hr) หรือตามเจ้าของใบลา
-// กฎรายห้องครบชุดเป็นงานของสัปดาห์ที่ 8
+// สัปดาห์ที่ 9: กฎรายห้องครบชุดตาม ACL.md — แยกสิทธิ์ตามบทบาท (employee/manager/hr)
+// และตามความเป็นเจ้าของใบลา (requesterId) ไม่ใช่แค่ "ล็อกอินก่อน" อีกต่อไป
+//
+// หมายเหตุ: ภาษา Firestore Rules ไม่รองรับชื่อฟังก์ชัน/ตัวแปรภาษาไทย
+// (ต่างจากไฟล์ .js อื่นในโปรเจกต์) จึงตั้งชื่อเป็นภาษาอังกฤษในไฟล์นี้เท่านั้น
 // ─────────────────────────────────────────────────────────────
 
 rules_version = '2';
@@ -10,23 +12,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isManagerOrHr() {
+      return isSignedIn() && myRole() in ['manager', 'hr'];
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      allow read: if isSignedIn();
+      // สมัครสมาชิกใหม่: เขียนได้เฉพาะไฟล์ของตัวเอง และ role ต้องเป็น employee เท่านั้น
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'employee';
+      // แก้ไขไฟล์ของตัวเองได้ แต่ห้ามเปลี่ยนฟิลด์ role เอง (ระบบยังไม่มีหน้าจอจัดการ role)
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role;
     }
 
     match /leaveTypes/{typeId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
 
     match /leaveRequests/{requestId} {
-      allow read, write: if request.auth != null;
+      // ดูได้เฉพาะใบของตัวเอง เว้นแต่เป็นผู้อนุมัติหรือฝ่ายบุคคลที่ดูได้ทุกใบ
+      allow read: if isSignedIn()
+        && (resource.data.requesterId == request.auth.uid || isManagerOrHr());
+
+      // สร้างใบลาใหม่ได้เฉพาะของตัวเอง และต้องเริ่มที่สถานะ รอพิจารณา เสมอ
+      allow create: if isSignedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.status == 'รอพิจารณา';
+
+      // เปลี่ยนสถานะ/แก้ไขใบลาได้เฉพาะผู้อนุมัติหรือฝ่ายบุคคลเท่านั้น (employee แก้ไม่ได้เลย)
+      allow update: if isSignedIn() && isManagerOrHr();
+
+      // ลบได้เฉพาะเจ้าของใบ และใบต้องยังเป็น รอพิจารณา เท่านั้น
+      allow delete: if isSignedIn()
+        && resource.data.requesterId == request.auth.uid
+        && resource.data.status == 'รอพิจารณา';
 
       match /approvals/{approvalId} {
-        allow read, write: if request.auth != null;
+        allow read, create: if isSignedIn()
+          && (get(/databases/$(database)/documents/leaveRequests/$(requestId)).data.requesterId == request.auth.uid
+              || isManagerOrHr());
+        // ไม่มี allow update/delete — แก้ไข/ลบความเห็นเดิมไม่ได้ ไม่ว่าบทบาทใด
       }
 
       match /aiLog/{logId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isSignedIn()
+          && (get(/databases/$(database)/documents/leaveRequests/$(requestId)).data.requesterId == request.auth.uid
+              || isManagerOrHr());
       }
     }
   }

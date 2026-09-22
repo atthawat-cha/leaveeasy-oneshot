@@ -1,5 +1,9 @@
 # 🔧 LeaveEasy — จุดเริ่มต้นของใบงาน
 
+- 🚀 **เว็บที่ใช้งานได้จริง:** https://leaveeasy-a17ab.web.app
+- 🧪 **ผลการทดสอบ (สัปดาห์ที่ 9):** [test-results.md](test-results.md)
+- 📝 **สิ่งที่ยังไม่เสร็จ:** [BACKLOG.md](BACKLOG.md)
+
 **ผู้จัดทำ:** อรรถวัมน์ จันทร์ทองเมือง
 
 **ADT-RAISE Non-Degree Batch 2 · Module 2: MVP-Ready** (สัปดาห์ที่ 6–9)
